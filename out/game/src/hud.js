@@ -1,6 +1,9 @@
 import { C } from './config.js';
 export function text(ctx, label, x, y, size = 12, color = C.palette.muted, align = 'left') {
-  ctx.fillStyle = color; ctx.font = `${size >= 26 ? '700' : '500'} ${size}px monospace`; ctx.textAlign = align; ctx.fillText(label, x, y);
+  ctx.fillStyle = color; ctx.font = `${size >= 26 ? '700' : '500'} ${size}px monospace`; ctx.textAlign = 'left';
+  const spacing = size >= 26 ? 2 : .7, width = ctx.measureText(label).width + (label.length - 1) * spacing;
+  let cursor = align === 'center' ? x - width / 2 : align === 'right' ? x - width : x;
+  for (let i = 0; i < label.length; i++) { ctx.fillText(label[i], cursor, y); cursor += ctx.measureText(label[i]).width + spacing; }
 }
 export function drawHUD(ctx, w, state, paused) {
   const p = C.palette;
@@ -12,6 +15,22 @@ export function drawHUD(ctx, w, state, paused) {
   text(ctx, 'CHAIN', 650, 26); text(ctx, `×${w.combo}`, 650, 54, 25, p.amber);
   text(ctx, 'CORE INTEGRITY', 785, 26);
   for (let i = 0; i < C.lives; i++) { ctx.fillStyle = i < w.lives ? p.magenta : '#263147'; ctx.fillRect(786 + i * 34, 41, 25, 9); }
+  ctx.fillStyle = '#17273a'; ctx.fillRect(30, 70, 900, 3); ctx.fillStyle = p.cyan;
+  ctx.fillRect(30, 70, 900 * Math.max(0, 1 - (w.enemies.length + (w.spawnLeft || 0)) / (w.waveTotal || 1)), 3);
+  ctx.fillStyle = p.amber; ctx.fillRect(650, 61, 90 * Math.max(0, w.comboTime / 3), 2);
+  for (let i = 0; i < 4; i++) {
+    const value = i === 0 ? w.overdrive : i === 1 ? w.aegis : i === 2 ? w.pierce : Math.max(0, 2.5 - w.player.dash);
+    const color = i === 0 ? p.amber : i === 2 ? p.magenta : p.cyan, x = 47 + i * 146;
+    ctx.fillStyle = '#081323e8'; ctx.fillRect(x - 18, 525, 137, 30);
+    ctx.strokeStyle = value > 0 ? color : '#293d50'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, 540, 9, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, value / (i === 3 ? 2.5 : i === 1 ? 1 : 8))); ctx.stroke();
+    text(ctx, i === 0 ? 'OVERDRIVE' : i === 1 ? 'AEGIS' : i === 2 ? 'PIERCE' : 'DASH / SHIFT', x + 16, 538, 9, value ? color : p.muted);
+    text(ctx, i === 1 ? (value ? 'ARMED' : 'OFFLINE') : i === 3 ? (w.player.dash ? w.player.dash.toFixed(1) + 'S' : 'READY') : value.toFixed(1) + 'S', x + 16, 550, 8);
+  }
+  for (const e of w.enemies) if (e.type === 'boss') {
+    ctx.fillStyle = '#0a0e1eef'; ctx.fillRect(285, 91, 390, 48);
+    text(ctx, 'VAULT KEEPER / OMEGA SECURITY', 480, 108, 11, p.magenta, 'center');
+    ctx.fillStyle = '#382034'; ctx.fillRect(300, 120, 360, 6); ctx.fillStyle = p.magenta; ctx.fillRect(300, 120, 360 * e.hp / e.maxHp, 6);
+  }
   text(ctx, paused ? 'CONTAINMENT FIELD / STANDBY' : 'CONTAINMENT FIELD ACTIVE', 33, 589, 10);
   text(ctx, `HOSTILES ${w.enemies.length + (w.spawnLeft || 0)}  /  COLLECT THE AMBER SHARDS`, 926, 589, 10, p.muted, 'right');
   if (state === 'PLAY' && w.banner > 0) {
@@ -22,19 +41,23 @@ export function drawHUD(ctx, w, state, paused) {
   }
   if (state === 'START') {
     shade(ctx); text(ctx, 'A CINDER SYSTEMS SURVIVAL EXPERIMENT', 480, 194, 12, p.cyan, 'center');
-    text(ctx, 'NEON VAULT', 480, 262, 64, p.white, 'center');
-    text(ctx, 'Break the breach. Collect the energy. Stay alive.', 480, 302, 15, p.muted, 'center');
+    text(ctx, 'CINDER', 480, 259, 82, p.white, 'center');
+    text(ctx, 'P R O T O C O L', 480, 305, 28, p.white, 'center');
+    text(ctx, 'N E O N   V A U L T', 480, 154, 19, p.amber, 'center');
     ctx.strokeStyle = p.cyan; ctx.strokeRect(338, 338, 284, 48);
-    text(ctx, 'ENTER / CLICK TO INITIALIZE', 480, 368, 14, p.cyan, 'center');
+    ctx.globalAlpha = .65 + .35 * Math.cos((w.uiTime || w.time) * 3); text(ctx, 'ENTER / CLICK TO INITIALIZE', 480, 368, 14, p.cyan, 'center'); ctx.globalAlpha = 1;
     text(ctx, 'MOVE  WASD     AIM  MOUSE     FIRE  HOLD CLICK', 480, 428, 12, p.white, 'center');
-    text(ctx, 'CHAIN KILLS FOR MULTIPLIERS · PILLARS BLOCK PROJECTILES', 480, 454, 11, p.muted, 'center');
+    text(ctx, 'SHIFT / SPACE  DASH     P  PAUSE     R  REBOOT', 480, 454, 11, p.muted, 'center');
+    text(ctx, 'SURVIVE THE BREACH / DEFEAT THE KEEPER / CLAIM THE VAULT', 480, 493, 10, p.amber, 'center');
   }
   if (state === 'GAME_OVER') {
     shade(ctx); text(ctx, 'SIGNAL LOST / CORE FAILURE', 480, 205, 13, p.magenta, 'center');
+    text(ctx, 'CINDER PROTOCOL', 480, 155, 22, p.muted, 'center');
     text(ctx, 'VAULT SEALED', 480, 267, 52, p.white, 'center');
     text(ctx, `${String(w.score).padStart(6, '0')} SALVAGE  /  ${w.wave} SECTORS REACHED`, 480, 316, 18, p.amber, 'center');
-    text(ctx, 'PRESS R TO REBOOT', 480, 382, 17, p.cyan, 'center');
-    text(ctx, 'SAME SEED. A NEW CHANCE.', 480, 417, 11, p.muted, 'center');
+    ctx.globalAlpha = .65 + .35 * Math.cos((w.uiTime || w.time) * 3); text(ctx, 'PRESS R TO REBOOT', 480, 382, 17, p.cyan, 'center'); ctx.globalAlpha = 1;
+    text(ctx, `PERSONAL BEST / ${String(Math.max(w.high, w.score)).padStart(6, '0')}`, 480, 417, 12, p.amber, 'center');
+    text(ctx, 'NEON VAULT / WASD MOVE · MOUSE FIRE · SHIFT DASH', 480, 461, 10, p.muted, 'center');
   }
   if (paused) { shade(ctx); panel(ctx, 'PROTOCOL PAUSED', 'P TO RESUME', p.cyan); }
 }
