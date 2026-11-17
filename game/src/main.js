@@ -43,7 +43,7 @@ function update(dt) {
       b.hits = (b.hits || 1) - 1; if (b.hits <= 0) b.life = 0;
       e.hp--; e.flash = .09; burst(w, b.x, b.y, C.palette.amber, 4);
       if (e.hp <= 0) {
-        w.chain++; w.combo = Math.min(5, 1 + Math.floor(w.chain / 4)); w.comboTime = 3;
+        w.chain++; w.bestChain = Math.max(w.bestChain || 0, w.chain); w.combo = Math.min(5, 1 + Math.floor(w.chain / 4)); w.comboTime = 3;
         w.score += (e.type === 'sentry' ? 180 : e.type === 'dasher' ? 130 : 100) * w.combo;
         w.shards.push({ x: e.x, y: e.y, r: 7, life: 12 }); burst(w, e.x, e.y, C.palette.magenta); w.shake = 2;
         if (w.rng() < .25) w.pickups.push({ x: e.x, y: e.y, r: 14, life: 16, type: Math.floor(w.rng() * 3) });
@@ -89,7 +89,32 @@ if (['start', 'play', 'gameover', 'wave', 'boss'].includes(shot)) {
   w.waveTotal = 24; w.comboTime = 2.4; w.overdrive = 6.2; w.pierce = 4.8; w.aegis = 1; w.high = 32750;
   enemy(w, 'warden', 690, 442); enemy(w, 'spark', 365, 419); enemy(w, 'spark', 345, 438); enemy(w, 'spark', 327, 419);
   w.pickups.push({ x: 615, y: 385, r: 14, type: 0, life: 12 }, { x: 206, y: 278, r: 14, type: 1, life: 12 }, { x: 778, y: 222, r: 14, type: 2, life: 12 });
-  if (shot === 'wave') { state = 'WAVE_CLEAR'; w.cleared = 6000; }
+  w.muzzle = .1; w.player.dashTime = .12; w.player.dash = 1.8; w.bestChain = 24;
+  for (let i = 0; i < 12; i += 2) { w.player.trail[i] = w.player.x - i * 9; w.player.trail[i + 1] = w.player.y + i * 3; }
+  w.rings[0].life = .32;
+  for (const p of w.particles) { p.x += p.vx * .24; p.y += p.vy * .24; }
+  if (shot === 'start') {
+    w.player.x = 480; w.player.y = 407; w.player.angle = -.55;
+    w.enemies[0].x = 803; w.enemies[0].y = 166;
+    w.enemies[2].x = 169; w.enemies[2].y = 195;
+    w.enemies[3].x = 141; w.enemies[3].y = 430;
+    w.enemies[4].x = 795; w.enemies[4].y = 480;
+    w.enemies[5].x = 816; w.enemies[5].y = 393;
+    w.enemies.length = 6;
+    w.pickups.length = 0;
+    for (let i = 0; i < 12; i += 2) { w.player.trail[i] = 480 - i * 8; w.player.trail[i + 1] = 407 + i * 2; }
+    for (let i = 0; i < 14; i++) w.shards.push({ x: 120 + i * 53, y: 361 + Math.sin(i * 2) * 61, r: 7, life: 8 });
+  }
+  if (shot === 'wave') {
+    state = 'WAVE_CLEAR'; w.cleared = 6000; w.enemies.length = 0; w.spawnLeft = 0; w.orbs.length = 0;
+    w.rings.push({ x: 468, y: 345, life: .13, color: C.palette.cyan });
+    for (let i = 0; i < 22; i++) { const a = i * 2.4, d = 70 + i * 9; w.shards.push({ x: 468 + Math.cos(a) * d, y: 345 + Math.sin(a) * d * .62, r: 7, life: 8 }); }
+  }
+  if (shot === 'gameover') {
+    w.score = 32750; w.wave = 8; w.bestChain = 32; w.pickups.length = 0;
+    burst(w, 480, 390, C.palette.amber, 65);
+    for (const p of w.particles) { p.x += p.vx * 1.5; p.y += p.vy * .9; }
+  }
   if (shot === 'boss') { w.wave = 5; w.spawnLeft = 0; const boss = enemy(w, 'boss', 530, 236); boss.hp = 104; boss.clock = 3.8; boss.dashAngle = 1.8; for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8; w.orbs.push({ x: 530 + Math.cos(a) * 125, y: 236 + Math.sin(a) * 125, vx: Math.cos(a) * 125, vy: Math.sin(a) * 125, r: 5, life: 3 }); } }
   for (const e of w.enemies) { if (!e.trail) e.trail = new Float32Array(12); for (let i = 0; i < 12; i += 2) { e.trail[i] = e.x - Math.cos(e.angle) * i * 3; e.trail[i + 1] = e.y - Math.sin(e.angle) * i * 3; } }
   for (const b of w.bullets) { b.trail = new Float32Array(8); for (let i = 0; i < 8; i += 2) { b.trail[i] = b.x - b.vx * i * .009; b.trail[i + 1] = b.y - b.vy * i * .009; } }
